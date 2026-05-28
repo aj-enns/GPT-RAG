@@ -174,6 +174,15 @@ jq -c '.components[]' "$manifest_path" | while IFS= read -r comp; do
 
   deploy_sh="$target/scripts/deploy.sh"
   if [ -f "$deploy_sh" ]; then
+    if [ "$name" = "gpt-rag-ui" ]; then
+      hotfix_sh="$repo_root/scripts/applyFrontendHotfix.sh"
+      if [ -f "$hotfix_sh" ]; then
+        bash "$hotfix_sh" "$target"
+      else
+        yellow "gpt-rag-ui hotfix script not found at $hotfix_sh; continuing without patch."
+      fi
+    fi
+
     log_dir="$target/.logs"; mkdir -p "$log_dir"
     ts="$(date +%Y%m%d_%H%M%S)"
     log="$log_dir/deploy_${ts}.log"

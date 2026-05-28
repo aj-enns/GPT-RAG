@@ -11,6 +11,7 @@ __pycache__/
 *.pyc
 .logs/
 
+gpt-rag/*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

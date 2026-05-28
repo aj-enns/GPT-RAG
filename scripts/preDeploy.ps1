@@ -86,9 +86,9 @@ function ResourceGroup-Exists([string]$rg, [string]$subscription) {
     Write-Error "Azure CLI (az) not found; cannot verify resource group '$rg'."
     return $false
   }
-  $args = @('group','exists','-n', $rg)
-  if ($subscription) { $args += @('--subscription', $subscription) }
-  $result = & az @args 2>$null
+  $cliParameters = @('group','exists','-n', $rg)
+  if ($subscription) { $cliParameters += @('--subscription', $subscription) }
+  $result = & az @cliParameters 2>$null
   return ($LASTEXITCODE -eq 0 -and ($result.Trim().ToLower() -eq 'true'))
 }
 
@@ -170,6 +170,15 @@ foreach ($c in $manifest.components) {
   # Run child deploy.ps1 from the component ROOT so 'docker build .' sees the Dockerfile there
   $deployPs = Join-Path $target 'scripts\deploy.ps1'
   if (Test-Path -LiteralPath $deployPs) {
+    if ($name -eq 'gpt-rag-ui') {
+      $hotfixScript = Join-Path $repoRoot 'scripts\applyFrontendHotfix.ps1'
+      if (Test-Path -LiteralPath $hotfixScript) {
+        & $psExe -NoProfile -ExecutionPolicy Bypass -File $hotfixScript -ComponentRoot $target
+      } else {
+        Write-Warning "gpt-rag-ui hotfix script not found at $hotfixScript; continuing without patch."
+      }
+    }
+
     $logDir = Join-Path $target '.logs'
     New-Item -ItemType Directory -Force -Path $logDir | Out-Null
     $log = Join-Path $logDir ("deploy_{0:yyyyMMdd_HHmmss}.log" -f (Get-Date))

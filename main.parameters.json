@@ -85,12 +85,12 @@
           "name": "chat",
           "model": {
             "format": "OpenAI",
-            "name": "gpt-5-nano",
-            "version": "2025-08-07"
+            "name": "gpt-5.4-nano",
+            "version": "2026-03-17"
           },
           "sku": {
             "name": "GlobalStandard",
-            "capacity": 100
+            "capacity": 8
           },
           "canonical_name": "CHAT_DEPLOYMENT_NAME",
           "apiVersion": "2025-12-01-preview"
@@ -103,8 +103,8 @@
             "version": "1"
           },
           "sku": {
-            "name": "Standard",
-            "capacity": 100
+            "name": "GlobalStandard",
+            "capacity": 8
           },
           "canonical_name": "EMBEDDING_DEPLOYMENT_NAME",
           "apiVersion": "2025-01-01-preview"
