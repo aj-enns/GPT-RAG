@@ -1,10 +1,26 @@
+param(
+  [Parameter(Mandatory = $false)]
+  [string]$ComponentRoot
+)
+
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-param(
-  [Parameter(Mandatory = $true)]
-  [string]$ComponentRoot
-)
+# If ComponentRoot not provided, try to derive it from the script location or caller's context
+if ([string]::IsNullOrWhiteSpace($ComponentRoot)) {
+  # Try to find the gpt-rag-ui folder in sibling repos (common pattern)
+  $parent = Split-Path -Parent $PSScriptRoot
+  $candidate = Join-Path $parent 'gpt-rag-ui'
+  if (Test-Path -LiteralPath $candidate) {
+    $ComponentRoot = $candidate
+    Write-Host "ComponentRoot auto-detected: $ComponentRoot" -ForegroundColor Gray
+  } else {
+    Write-Host "  ⚠️  ComponentRoot not provided and gpt-rag-ui sibling not found; skipping hotfixes." -ForegroundColor Yellow
+    exit 0
+  }
+}
+
+Write-Host "Using ComponentRoot: $ComponentRoot" -ForegroundColor Gray
 
 function Update-ExactBlock {
   param(
@@ -32,6 +48,26 @@ function Update-ExactBlock {
 Write-Host "Applying GPT-RAG UI deployment hotfixes..." -ForegroundColor Cyan
 
 $appconfigPath = Join-Path $ComponentRoot 'connectors\appconfig.py'
+
+# Hotfix: normalize invalid AZURE_CLIENT_ID="*" (default when unset) to None so
+# ManagedIdentityCredential picks up the SystemAssigned identity instead of failing
+# with "invalid_scope". Required when Container App uses SystemAssigned identity.
+$oldClientId = @"
+        try:
+            self.client_id = os.environ.get('AZURE_CLIENT_ID', "*")
+        except Exception as e:
+            raise e
+"@
+$newClientId = @"
+        try:
+            _cid = os.environ.get('AZURE_CLIENT_ID', "*")
+            # Treat sentinel "*" or empty as unset (SystemAssigned identity).
+            self.client_id = _cid if _cid and _cid != "*" else None
+        except Exception as e:
+            raise e
+"@
+Update-ExactBlock -Path $appconfigPath -Old $oldClientId -New $newClientId -Label 'connectors/appconfig.py (client_id normalize)'
+
 $oldAppConfig = @"
         except (ClientAuthenticationError, AzureError) as e:
             # Most common local dev issue: not logged in / no managed identity.
