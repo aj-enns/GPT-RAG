@@ -1,0 +1,17 @@
+# Architecture Advisor — Phase 1 dependencies
+#
+# Merge into:
+#   - gpt-rag-orchestrator/requirements.txt  (top group below)
+#   - gpt-rag-ingestion/requirements.txt     (bottom group below)
+#
+# Pin to compatible release lines so existing GPT-RAG components keep working.
+
+# --- orchestrator (classifier + synthesizer + strategy) ---------------------
+openai>=1.40.0
+azure-identity>=1.17.0
+azure-search-documents>=11.5.0
+
+# --- ingestion (catalog scraper) -------------------------------------------
+httpx>=0.27.0
+beautifulsoup4>=4.12.3
+tenacity>=8.2.3

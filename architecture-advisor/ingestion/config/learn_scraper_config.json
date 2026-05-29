@@ -1,0 +1,42 @@
+{
+  "source": "learn-architecture-center",
+  "browse_url": "https://learn.microsoft.com/en-us/azure/architecture/browse/",
+  "user_agent": "gpt-rag-architecture-advisor/0.1 (+https://github.com/Azure/gpt-rag)",
+  "request_timeout_seconds": 30,
+  "max_concurrent_fetches": 4,
+  "request_delay_seconds": 0.5,
+  "max_items_per_run": null,
+  "schedule_cron": "0 3 * * 0",
+  "ai_keywords": [
+    "openai",
+    "cognitive services",
+    "ai foundry",
+    "azure ai",
+    "machine learning",
+    " ml ",
+    "form recognizer",
+    "document intelligence",
+    "vision",
+    "speech",
+    "language",
+    "translator",
+    "personalizer",
+    "anomaly detector",
+    "metrics advisor",
+    "bot service",
+    "chatbot",
+    "copilot",
+    "rag",
+    "embeddings",
+    "vector",
+    "llm",
+    "generative",
+    "predictive",
+    "intelligent"
+  ],
+  "cost_band_hints": {
+    "low": ["static web", "functions", "logic apps", "serverless"],
+    "medium": ["app service", "container apps", "aks"],
+    "high": ["openai", "ai foundry", "hpc", "high-performance"]
+  }
+}

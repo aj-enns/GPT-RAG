@@ -306,6 +306,84 @@
         ]
       }
       {% endif %}
+    },
+    {
+      "name": "{{SEARCH_ARCHITECTURE_INDEX_NAME}}",
+      "description": "Azure Architecture Center catalog. Used by the Architecture Advisor strategy to suggest patterns for customer-described workloads.",
+      "fields": [
+        { "name": "id",             "type": "Edm.String",             "key": true,  "searchable": true,  "retrievable": true, "filterable": true, "analyzer": "keyword" },
+        { "name": "title",          "type": "Edm.String",             "searchable": true,  "retrievable": true,  "filterable": true,  "analyzer": "{{SEARCH_ANALYZER_NAME}}" },
+        { "name": "url",            "type": "Edm.String",             "searchable": false, "retrievable": true },
+        { "name": "summary",        "type": "Edm.String",             "searchable": true,  "retrievable": true,  "analyzer": "{{SEARCH_ANALYZER_NAME}}" },
+        { "name": "content",        "type": "Edm.String",             "searchable": true,  "retrievable": false, "analyzer": "{{SEARCH_ANALYZER_NAME}}" },
+        { "name": "azureServices",  "type": "Collection(Edm.String)", "searchable": true,  "retrievable": true,  "filterable": true, "facetable": true },
+        { "name": "categories",     "type": "Collection(Edm.String)", "searchable": true,  "retrievable": true,  "filterable": true, "facetable": true },
+        { "name": "usesAi",         "type": "Edm.Boolean",            "filterable": true,  "retrievable": true, "facetable": true },
+        { "name": "costBand",       "type": "Edm.String",             "filterable": true,  "retrievable": true, "facetable": true },
+        { "name": "source",         "type": "Edm.String",             "filterable": true,  "retrievable": true, "facetable": true },
+        { "name": "contentVector",  "type": "Collection(Edm.Single)", "searchable": true,  "retrievable": false, "dimensions": "{{EMBEDDINGS_VECTOR_DIMENSIONS}}", "vectorSearchProfile": "default" }
+      ],
+      "corsOptions": {
+        "allowedOrigins": ["*"],
+        "maxAgeInSeconds": 60
+      },
+      {% if EMBEDDING_MODEL_INFO %}
+      "vectorSearch": {
+        "profiles": [
+          { "name": "default", "algorithm": "hnsw", "vectorizer": "azure_openai_vectorizer" }
+        ],
+        "algorithms": [
+          {
+            "name": "hnsw",
+            "kind": "hnsw",
+            "hnswParameters": { "m": 4, "efConstruction": 400, "efSearch": 500, "metric": "cosine" }
+          }
+        ],
+        "vectorizers": [
+          {
+            "name": "azure_openai_vectorizer",
+            "kind": "azureOpenAI",
+            "azureOpenAIParameters": {
+              "resourceUri": "{{EMBEDDING_MODEL_INFO.endpoint}}",
+              "deploymentId": "{{EMBEDDING_MODEL_INFO.deployment_name}}",
+              "modelName": "{{EMBEDDING_MODEL_INFO.model_name}}"
+            }
+          }
+        ]
+      },
+      {% else %}
+      "vectorSearch": {
+        "profiles": [
+          { "name": "default", "algorithm": "hnsw" }
+        ],
+        "algorithms": [
+          {
+            "name": "hnsw",
+            "kind": "hnsw",
+            "hnswParameters": { "m": 4, "efConstruction": 400, "efSearch": 500, "metric": "cosine" }
+          }
+        ]
+      },
+      {% endif %}
+      "semantic": {
+        "defaultConfiguration": "semantic-config",
+        "configurations": [
+          {
+            "name": "semantic-config",
+            "prioritizedFields": {
+              "titleField": { "fieldName": "title" },
+              "prioritizedContentFields": [
+                { "fieldName": "summary" },
+                { "fieldName": "content" }
+              ],
+              "prioritizedKeywordsFields": [
+                { "fieldName": "azureServices" },
+                { "fieldName": "categories" }
+              ]
+            }
+          }
+        ]
+      }
     }
   ],
   "datasources": [],

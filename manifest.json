@@ -10,13 +10,13 @@
     },
     {
       "name": "gpt-rag-orchestrator",
-      "repo": "https://github.com/azure/gpt-rag-orchestrator.git",
-      "tag": "v2.6.3"
+      "repo": "https://github.com/aj-enns/gpt-rag-orchestrator.git",
+      "branch": "feature/architecture-advisor"
     },
     {
       "name": "gpt-rag-ingestion",
-      "repo": "https://github.com/azure/gpt-rag-ingestion.git",
-      "tag": "v2.3.4"
+      "repo": "https://github.com/aj-enns/gpt-rag-ingestion.git",
+      "branch": "feature/architecture-advisor"
     }
   ]
 }
