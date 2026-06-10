@@ -67,8 +67,11 @@ for FILE_NAME in manifest.json main.parameters.json; do
 done
 
 ###############################################################################
-# AI Landing Zone v2.0.0+ preflight validation
-# https://github.com/Azure/bicep-ptn-aiml-landing-zone/blob/v2.0.0/scripts/Invoke-PreflightChecks.ps1
+# AI Landing Zone v2.0.4+ preflight validation
+# https://github.com/Azure/bicep-ptn-aiml-landing-zone/blob/v2.0.4/scripts/Invoke-PreflightChecks.ps1
+# Covers parameter/topology/BYO/IP checks plus regional readiness (subscription
+# drift, provider/location, AI Search & Cosmos capacity warnings, jumpbox VM SKU,
+# model quota).
 ###############################################################################
 
 PREFLIGHT_SCRIPT="$INFRA_DIR/scripts/Invoke-PreflightChecks.ps1"

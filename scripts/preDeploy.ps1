@@ -1,24 +1,13 @@
-# Works from ...\gpt-rag or any subfolder
+﻿# Works from ...\gpt-rag or any subfolder
 # PowerShell 7+ recommended
 try { [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false) } catch {}
 $ProgressPreference = 'SilentlyContinue'   # hide PS progress bars
-
-if ($env:AZURE_ZERO_TRUST -eq "TRUE") {
-  $c = Read-Host -Prompt "Zero Trust enabled. Confirm resources are reachable (VM+Bastion)? [Y/n]"
-  if ($c -ne "Y" -and $c -ne "y" -and $c) { exit 0 }
-}
 
 function Docker-Ready {
   try {
     $null = & docker info 2>$null
     return ($LASTEXITCODE -eq 0)
   } catch { return $false }
-}
-
-# Hard preflight: require Docker daemon
-if (-not (Docker-Ready)) {
-  Write-Host "Docker daemon is not running. Start Docker Desktop and try again"
-  exit 11
 }
 
 function Find-RepoRoot([string]$start) {
@@ -110,6 +99,30 @@ $dotAzure   = Join-Path $repoRoot '.azure'
 $globalEnv  = Get-AzdEnv -projectPath $repoRoot
 $globalRG   = $globalEnv.AZURE_RESOURCE_GROUP
 $globalSub  = $globalEnv.AZURE_SUBSCRIPTION_ID
+
+# Make azd outputs available to component deploy scripts. In network-isolated
+# deployments the jumpbox intentionally has no Docker, so components need
+# ACR_TASK_AGENT_POOL/NETWORK_ISOLATION to select remote ACR builds.
+foreach ($prop in $globalEnv.PSObject.Properties) {
+  if ($null -ne $prop.Value -and "$($prop.Value)" -ne '') {
+    Set-Item -Path "Env:$($prop.Name)" -Value "$($prop.Value)"
+  }
+}
+
+$networkIsolation = "$($globalEnv.NETWORK_ISOLATION)".ToLowerInvariant() -eq 'true'
+$runningFromJumpbox = "$($env:RUN_FROM_JUMPBOX)".ToLowerInvariant() -eq 'true'
+if ($networkIsolation -and -not $runningFromJumpbox) {
+  Write-Error "NETWORK_ISOLATION=true deployments must run from the jumpbox/VNet. Provision from the workstation, then run azd deploy from the jumpbox with RUN_FROM_JUMPBOX=true."
+  exit 4
+}
+
+if (-not (Docker-Ready)) {
+  if ($networkIsolation -or $globalEnv.ACR_TASK_AGENT_POOL) {
+    Write-Host "Docker is not available; component deploys will use ACR remote builds." -ForegroundColor Yellow
+  } else {
+    Write-Host "Docker daemon is not running; component deploy scripts will fall back to ACR remote builds where supported." -ForegroundColor Yellow
+  }
+}
 
 # Global RG check once (fail early)
 if (-not $globalRG) { Write-Error "AZURE_RESOURCE_GROUP not found in env."; exit 2 }

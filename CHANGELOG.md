@@ -1,15 +1,273 @@
 # Changelog
 
+## [v2.8.3] - 2026-06-10
+
+### Fixed
+- **Foundry Agent Service v2 create-once regression on `single_agent_rag` (issue [#484](https://github.com/Azure/GPT-RAG/issues/484)):** Bumps `gpt-rag-orchestrator` from `v2.8.1` to `v2.8.2`, which restores the migration to declarative/versioned Foundry prompt agents (`AIProjectClient.agents.create_version()` with `PromptAgentDefinition`). The fix coexists with the conversation-scoped retrieval introduced in v2.8.2, so `single_agent_rag` and `maf_agent_service` now reuse definition-fingerprinted prompt agents end-to-end without regressing per-conversation document upload retrieval.
+
+### Validation
+The following component versions were validated together for this release:
+
+| Component | Version |
+| --- | --- |
+| gpt-rag-ui | v2.3.10 |
+| gpt-rag-orchestrator | v2.8.2 |
+| gpt-rag-ingestion | v2.4.3 |
+| infra (landing zone) | v2.0.14 |
+
+Validated by re-running the orchestrator suite (166 tests passed locally) and confirming the `single_agent_rag` agent path on a deployed Azure validation environment using the published `v2.8.2` orchestrator image.
+
+## [v2.8.2] - 2026-06-04
+
+### Fixed
+- **Uploaded documents now work end-to-end in authenticated chat (issue #478):** GPT-RAG now pins updated UI, orchestrator, and ingestion components that preserve the uploader identity during ingestion and propagate the active conversation id during retrieval. This lets uploaded files be indexed with the correct ACL metadata and retrieved by the `single_agent_rag` strategy in the same chat conversation.
+
+### Validation
+The following component versions were validated together for this release:
+
+| Component | Version |
+| --- | --- |
+| gpt-rag-ui | v2.3.10 |
+| gpt-rag-orchestrator | v2.8.1 |
+| gpt-rag-ingestion | v2.4.3 |
+| infra (landing zone) | v2.0.14 |
+
+Validated the component pins and manifest update, then confirmed the document upload flow in a deployed Azure validation environment: authenticated upload is available in the UI, ingestion returns indexed chunks without warnings, and uploaded content is available to chat retrieval for the active conversation.
+
+## [v2.8.1] - 2026-06-04
+
+### Changed
+- **Landing zone submodule bumped to `v2.0.14` and Dapr declared explicitly for GPT-RAG Container Apps.** `manifest.json` `ailz_tag`, `.gitmodules` `branch`, and the recorded `infra/` submodule gitlink now consume the upstream Dapr opt-in change from [Azure/bicep-ptn-aiml-landing-zone#86](https://github.com/Azure/bicep-ptn-aiml-landing-zone/issues/86). Because GPT-RAG uses Dapr for inter-container service invocation, `main.parameters.json` now sets `dapr.enabled=true` for the orchestrator, frontend, and data ingestion Container Apps, preserving the current runtime behavior while allowing the landing zone default to remain Dapr-disabled for external apps.
+
+### Validation
+The following component versions were validated together for this release:
+
+| Component | Version |
+| --- | --- |
+| gpt-rag-ui | v2.3.9 |
+| gpt-rag-orchestrator | v2.8.0 |
+| gpt-rag-ingestion | v2.4.2 |
+| infra (landing zone) | v2.0.14 |
+Validated the updated parameters and landing zone integration with JSON parsing, `az bicep build --file infra\main.bicep`, and `azd provision --preview --no-prompt` in env `gptrag-0604261534`, resource group `rg-gptrag-0604261534`, region `eastus2`. Confirmed `main.parameters.json` sets `dapr.enabled=true` for `orchestrator`, `frontend`, and `dataingest`.
+Validated the updated parameters and landing zone integration with JSON parsing, `az bicep build --file infra\main.bicep`, and `azd provision --preview --no-prompt` in env `gptrag-0604261534`, resource group `rg-gptrag-0604261534`, region `eastus2`. Confirmed `main.parameters.json` sets `dapr.enabled=true` for `orchestrator`, `frontend`, and `dataingest`.
+
+## [v2.8.0] - 2026-06-02
+
+### Changed
+- **Orchestrator bumped to `v2.8.0` for Foundry Agent Service v2 reusable agents.** The `single_agent_rag` and `maf_agent_service` strategies now use declarative/versioned Foundry prompt agents through `AIProjectClient.agents.create_version()` and `PromptAgentDefinition`, creating a reusable agent once per deterministic definition fingerprint and reusing it on subsequent requests. This removes the old ephemeral per-request Agent Service creation pattern and fixes the per-run `reasoning` payload rejection by baking reasoning effort into the prompt-agent definition. Implements [Azure/GPT-RAG#477](https://github.com/Azure/GPT-RAG/issues/477).
+- **Landing zone submodule bumped to `v2.0.13`.** `manifest.json` `ailz_tag`, `.gitmodules` `branch`, and the recorded `infra/` submodule gitlink now consume the Foundry Agent Service v2 Cosmos RBAC fix. The AI Foundry project managed identity receives data-plane access to the capability-host `agent-definitions-v1` and `run-state-v1` containers required by declarative/versioned agents, so fresh deployments do not require manual Cosmos role assignments.
+
+### Validation
+The following component versions were validated together for this release:
+
+| Component | Version |
+| --- | --- |
+| gpt-rag-ui | v2.3.9 |
+| gpt-rag-orchestrator | v2.8.0 |
+| gpt-rag-ingestion | v2.4.2 |
+| infra (landing zone) | v2.0.13 |
+
+End-to-end validated on Azure in env `gptrag-0602260836`, resource group `rg-gptrag-0602260836`, region `swedencentral`, with `AGENT_STRATEGY=single_agent_rag`. The orchestrator image built from commit `b0b9ae1` was deployed to Container Apps revision `ca-m53sdv7aincme-orchestrator--0000002` and received 100% traffic. Azure logs confirmed the new Foundry path: `Prompt agent 'gptrag-single-agent-rag-b622680c09' not found; creating once via create_version`, then `Created prompt agent ... (version=1)`, followed by request-time `Index Empty Check Result: False`, `Routing to Azure AI Agents SDK`, and `Streaming from Foundry prompt agent (Responses)`. Two live `/orchestrator` POST requests returned HTTP 200 with no `invalid_payload` run-time reasoning error and no Cosmos DB 403.
+
+## [v2.7.14] - 2026-06-01
+
+### Changed
+- **Landing zone submodule bumped to `v2.0.12`.** `manifest.json` `ailz_tag`, `.gitmodules` `branch`, and the recorded `infra/` submodule gitlink were updated to consume the upstream Windows jumpbox CSE timeout fix for Zero Trust deployments ([Azure/bicep-ptn-aiml-landing-zone#82](https://github.com/Azure/bicep-ptn-aiml-landing-zone/issues/82)) plus the Windows PowerShell 5.1 parser, Git clone watchdog, and non-interactive `azd init` hotfixes discovered during GPT-RAG validation. The landing zone now self-limits `install.ps1` under the platform's fixed 90-minute Custom Script Extension window: Chocolatey installs are capped with `--execution-timeout=600`, downloads and `azd` calls are bounded, optional bootstrap steps are skipped when the wall-clock budget is low, win-acme staging is non-fatal, component clone/update loops run through the bounded watchdog path, and `AZD_SKIP_FIRST_RUN=true` prevents azd first-run tooling prompts from blocking the jumpbox CSE. No GPT-RAG parameter changes are required; this release only advances the pinned landing zone so new GPT-RAG deployments fetch the fixed bootstrap script.
+
+### Validation
+The following component versions were validated together for this release:
+
+| Component | Version |
+| --- | --- |
+| gpt-rag-ui | v2.3.9 |
+| gpt-rag-orchestrator | v2.6.11 |
+| gpt-rag-ingestion | v2.4.2 |
+| infra (landing zone) | v2.0.12 |
+
+End-to-end validated on Azure in two complementary topologies. The Zero-Trust path (env `gptrag-0601261130`, RG `rg-gptrag-0601261130`, `francecentral`, `NETWORK_ISOLATION=true`, `DEPLOY_JUMPBOX=true`) confirmed the v2.0.12 fix-set on its target surface: `az bicep build --file .\infra\main.bicep` succeeded with only pre-existing warnings, and `azd provision --no-prompt` completed with the Windows jumpbox Custom Script Extension running the bounded `install.ps1` from landing zone `v2.0.12` (no 90-minute CSE timeout, no PowerShell 5.1 parser error, no Git clone watchdog false-fail, no azd first-run prompt block) — exercising the entire landing-zone-side fix-set targeted by this bump. The standard path (env `gptrag-0601261557`, RG `rg-gptrag-0601261557`, `swedencentral`, `NETWORK_ISOLATION=false`) then covered the full GPT-RAG flow end-to-end: `azd provision --no-prompt` completed in 28m59s (preflight 0 fail / 3 warn, all resources Succeeded including AI Foundry, capability host, model deployments, AI Search, knowledge sources and knowledge bases) and `azd deploy --no-prompt` built each component image via ACR remote build and updated all three Container Apps to revision `0000001`. The Container Apps `ca-oubo4ovyeuhjo-frontend`, `ca-oubo4ovyeuhjo-orchestrator`, and `ca-oubo4ovyeuhjo-dataingest` all reported `runningStatus=Running` / `provisioningState=Succeeded` with 1 replica, and HTTP smoke checks returned 200 for the frontend root and dataingest root (the orchestrator returned 404 at `/` because it has no root route; the service is live).
+
+## [v2.7.13] - 2026-05-31
+
+### Changed
+- **Landing zone submodule bumped to `v2.0.8`.** `manifest.json` `ailz_tag` and `.gitmodules` `branch` updated. The bump rolls up four upstream releases:
+  - v2.0.5 added `acrTaskConfig` so consumers can opt into ACR Tasks remote builds at provision time, and added `packages.microsoft.com` to the default ACR Tasks OS package allow-list ([Azure/bicep-ptn-aiml-landing-zone#68](https://github.com/Azure/bicep-ptn-aiml-landing-zone/issues/68)).
+  - v2.0.6 flipped `deployVmKeyVault` default from `true` to `false` (the parameter never actually gated a resource — only the `DEPLOY_VM_KEY_VAULT` azd output, which is preserved for backward compatibility).
+  - v2.0.7 ([Azure/bicep-ptn-aiml-landing-zone#78](https://github.com/Azure/bicep-ptn-aiml-landing-zone/issues/78)) added a `dependsOn` between Container Apps and `firewallPolicyDefaultRuleCollectionGroup` as defence-in-depth so the placeholder MCR pull cannot race the firewall's `AllowMicrosoftContainerRegistry` rule.
+  - v2.0.8 ([Azure/bicep-ptn-aiml-landing-zone#80](https://github.com/Azure/bicep-ptn-aiml-landing-zone/issues/80) / [#81](https://github.com/Azure/bicep-ptn-aiml-landing-zone/pull/81)) is the actual ZTA fix: Azure Firewall rejects `ApplicationRule.targetFqdns: []` at the ARM request-validation layer with `BadRequest: "The request is invalid."`, so the whole `DefaultRuleCollectionGroup` failed in ~0.3s and the firewall stayed empty whenever an optional feature was disabled. With the GPT-RAG default `DEPLOY_ACR_TASK_AGENT_POOL=false`, three rules (`AllowAcrTasks`, `AllowAcrTaskDevRuntimes`, `AllowAcrTaskOsPackages`) shipped with empty targets, which blocked every ZTA `azd provision` on v2.0.4-v2.0.7. v2.0.8 wraps the rule list in `filter(..., r => !empty(r.targetFqdns))` so empty rules are omitted from the ARM payload. The downstream symptom — Container Apps failing to pull `mcr.microsoft.com/dotnet/samples:aspnetapp-9.0` because the `aca-environment-subnet` UDR forces egress through a firewall with zero rules — is fully resolved by this fix.
+  No GPT-RAG parameters change; this is a passthrough bump that picks up the upstream fixes and unblocks ZTA deployments.
+
+### Validation
+End-to-end validated on Azure with the Zero-Trust topology (`NETWORK_ISOLATION=true`).
+
+## [v2.7.12] - 2026-05-29
+
+### Changed
+- **Landing zone submodule bumped to `v2.0.4`.** `manifest.json` `ailz_tag` and `.gitmodules` `branch` updated. v2.0.3 extended `infra/scripts/Invoke-PreflightChecks.ps1` with regional readiness checks (subscription drift, provider/location, AI Search & Cosmos capacity warnings, jumpbox VM SKU, OpenAI model quota) — all driven by `main.parameters.json`, so they are now available to every consumer of the landing zone. v2.0.4 is a same-day hotfix on top of v2.0.3 ([Azure/bicep-ptn-aiml-landing-zone#74](https://github.com/Azure/bicep-ptn-aiml-landing-zone/issues/74) / [#75](https://github.com/Azure/bicep-ptn-aiml-landing-zone/pull/75)) for a PowerShell parser regression in the new regional block: `ConvertTo-Bool (if (...) { ... } else { $true })` is rejected by pwsh with `The term 'if' is not recognized` because `if` is not a valid expression inside `(...)` when passed as a command argument; the fix wraps each conditional with the subexpression operator `$(if ...)`. Without v2.0.4 every `azd provision` consuming v2.0.3 aborts immediately after the preflight banner.
+
+### Removed
+- **`scripts/Invoke-GptRagRegionalPreflight.ps1` deleted; invocation removed from `scripts/preProvision.{ps1,sh}`.** Every check the GPT-RAG-specific preflight performed (region match, jumpbox VM SKU, provider/location support for AI Search/Cosmos/Container Apps/AI Foundry, transient capacity warnings, OpenAI model quota) is now performed by the landing-zone preflight in v2.0.3+. The legacy `GPT_RAG_REGIONAL_PREFLIGHT_SKIP` env var is no longer recognized — use `PREFLIGHT_SKIP=true` to bypass everything, or `LZ_PREFLIGHT_REGIONAL_SKIP=true` to bypass only the regional block while keeping parameter/topology/CIDR/BYO checks. Closes the duplication tracked in [Azure/bicep-ptn-aiml-landing-zone#72](https://github.com/Azure/bicep-ptn-aiml-landing-zone/issues/72).
+
+### Validation
+The following component versions were validated together for this release:
+
+| Component | Version |
+| --- | --- |
+| gpt-rag-ui | v2.3.9 |
+| gpt-rag-orchestrator | v2.6.11 |
+| gpt-rag-ingestion | v2.4.2 |
+| gpt-rag-mcp | v0.3.8 |
+| infra (landing zone) | v2.0.4 |
+
+End-to-end validated in `francecentral` with `NETWORK_ISOLATION=false` (env `gptrag-0530260731`, RG `rg-gptrag-0530260731`): full `azd provision` (preflight emitted the regional readiness block from the landing zone v2.0.4 without the v2.0.3 parser error — 3 transient capacity warnings, 0 failures; provisioning completed in 27m05s) + `azd deploy` succeeded. Health endpoints returned HTTP 200: frontend `/`, orchestrator `/docs`, ingestion `/readyz`, and ingestion `/api/version`. Initial run in `swedencentral` proved the preflight fix worked (the script ran past the previously-failing line 950) but provisioning aborted at AI Foundry model deployment due to a regional `text-embedding-3-large` quota exhaustion (independent of this release); the validation was therefore completed in `francecentral`.
+
+
+## [v2.7.11] - 2026-05-29
+
+### Changed
+- **Regional preflight: warn about Azure AI Search transient capacity.** `scripts/Invoke-GptRagRegionalPreflight.ps1` now adds a Warn next to the existing PASS for Azure AI Search, mirroring the Cosmos DB pattern. The PASS still confirms regional provider/SKU support, but operators are now explicitly told that pre-create capacity (`InsufficientResourcesAvailable`) is not exposed by a reliable quota API and provisioning may still fail on transient regional saturation. Closes [#470](https://github.com/Azure/GPT-RAG/issues/470).
+
+### Validation
+The following component versions were validated together for this release:
+
+| Component | Version |
+| --- | --- |
+| gpt-rag-ui | v2.3.9 |
+| gpt-rag-orchestrator | v2.6.11 |
+| gpt-rag-ingestion | v2.4.2 |
+| gpt-rag-mcp | v0.3.8 |
+| infra (landing zone) | v2.0.2 |
+
+
+
 All notable changes to this project will be documented in this file.  
 This format follows [Keep a Changelog](https://keepachangelog.com/) and adheres to [Semantic Versioning](https://semver.org/).
+
+## [v2.7.10] - 2026-05-28
+
+### Fixed
+- **Ingestion Managed Identity client ID fallback in Azure Container Apps:** bumped `gpt-rag-ingestion` to [v2.4.2](https://github.com/Azure/gpt-rag-ingestion/releases/tag/v2.4.2), preserving App Configuration precedence for `AZURE_CLIENT_ID` while falling back to the Container Apps-injected environment variable when the key is absent. This completes the fix for `/ingest-documents` returning HTTP 200 with `indexedChunks: 0` due to user-assigned Managed Identity token acquisition failures.
+
+### Validation
+The following component versions were validated together for this release:
+
+| Component | Version |
+| --- | --- |
+| gpt-rag-ui | v2.3.9 |
+| gpt-rag-orchestrator | v2.6.11 |
+| gpt-rag-ingestion | v2.4.2 |
+| gpt-rag-mcp | v0.3.8 |
+| infra (landing zone) | v2.0.2 |
+
+## [v2.7.9] - 2026-05-28
+
+### Fixed
+- **Ingestion Managed Identity authentication in Azure Container Apps:** bumped `gpt-rag-ingestion` to [v2.4.1](https://github.com/Azure/gpt-rag-ingestion/releases/tag/v2.4.1), updating `azure-identity` so `/ingest-documents` can authenticate sync Content Understanding, Blob Storage, and embedding paths with user-assigned Managed Identity.
+
+### Validation
+The following component versions were validated together for this release:
+
+| Component | Version |
+| --- | --- |
+| gpt-rag-ui | v2.3.9 |
+| gpt-rag-orchestrator | v2.6.11 |
+| gpt-rag-ingestion | v2.4.1 |
+| gpt-rag-mcp | v0.3.8 |
+| infra (landing zone) | v2.0.2 |
+
+## [v2.7.8] - 2026-05-28
+
+### Changed
+- **Grouped dependency refresh across GPT-RAG components:** updated the service manifest to consume `gpt-rag-ui` [v2.3.9](https://github.com/Azure/gpt-rag-ui/releases/tag/v2.3.9), `gpt-rag-orchestrator` [v2.6.11](https://github.com/Azure/gpt-rag-orchestrator/releases/tag/v2.6.11), and `gpt-rag-ingestion` [v2.4.0](https://github.com/Azure/gpt-rag-ingestion/releases/tag/v2.4.0). `gpt-rag-mcp` [v0.3.8](https://github.com/Azure/gpt-rag-mcp/releases/tag/v0.3.8) was released in the same dependency refresh batch; the MCP server remains an optional component and is not listed in the default deployment manifest.
+
+### Validation
+The following component versions were validated together for this release:
+
+| Component | Version |
+| --- | --- |
+| gpt-rag-ui | v2.3.9 |
+| gpt-rag-orchestrator | v2.6.11 |
+| gpt-rag-ingestion | v2.4.0 |
+| gpt-rag-mcp | v0.3.8 |
+| infra (landing zone) | v2.0.2 |
+
+## [v2.7.7] - 2026-05-27
+
+### Changed
+- **Grouped dependency refresh across GPT-RAG components:** bumped `requests` in the core configuration tooling to 2.33.0 and updated the service manifest to consume `gpt-rag-ui` [v2.3.8](https://github.com/Azure/gpt-rag-ui/releases/tag/v2.3.8), `gpt-rag-orchestrator` [v2.6.10](https://github.com/Azure/gpt-rag-orchestrator/releases/tag/v2.6.10), and `gpt-rag-ingestion` [v2.3.8](https://github.com/Azure/gpt-rag-ingestion/releases/tag/v2.3.8). `gpt-rag-mcp` [v0.3.7](https://github.com/Azure/gpt-rag-mcp/releases/tag/v0.3.7) was released in the same dependency refresh batch; the MCP server remains an optional component and is not listed in the default deployment manifest.
+
+### Validation
+The following component versions were validated together for this release:
+
+| Component | Version |
+| --- | --- |
+| gpt-rag-ui | v2.3.8 |
+| gpt-rag-orchestrator | v2.6.10 |
+| gpt-rag-ingestion | v2.3.8 |
+| gpt-rag-mcp | v0.3.7 |
+| infra (landing zone) | v2.0.2 |
+
+## [v2.7.6] - 2026-05-27
+
+### Changed
+- **Bumped `gpt-rag-orchestrator` to [v2.6.9](https://github.com/Azure/gpt-rag-orchestrator/releases/tag/v2.6.9)** to consume long conversation history compaction and retrieval-needed triage improvements.
+
+### Fixed
+- **Long conversations no longer grow persisted Cosmos DB documents indefinitely:** the orchestrator now compacts persisted conversation documents by serialized size and message count while keeping recent messages and question metadata. It also skips unnecessary Azure AI Search calls for no-retrieval follow-ups such as formatting, translation, summarization, or rephrasing. Fixes [Azure/GPT-RAG#448](https://github.com/Azure/GPT-RAG/issues/448).
+
+## [v2.7.5] - 2026-05-26
+
+### Added
+- **Existing-platform deployment parameters surfaced:** `main.parameters.json` now passes through AI Landing Zone v2.0.2 settings for BYO Private DNS zones, shared observability, hub integration, existing jumpbox/Bastion/NAT resources, Private Endpoint placement, ACR Task agent pools, speech resources, and policy-managed private DNS. This allows GPT-RAG deployments to integrate with existing enterprise landing zones without editing the infra submodule. Fixes [Azure/GPT-RAG#452](https://github.com/Azure/GPT-RAG/issues/452) and [Azure/GPT-RAG#453](https://github.com/Azure/GPT-RAG/issues/453).
+
+### Changed
+- **Bumped component releases for NL2SQL and conversation rename fixes:** `gpt-rag-ui` to [v2.3.7](https://github.com/Azure/gpt-rag-ui/releases/tag/v2.3.7) and `gpt-rag-orchestrator` to [v2.6.8](https://github.com/Azure/gpt-rag-orchestrator/releases/tag/v2.6.8).
+
+### Fixed
+- **NL2SQL no longer depends on Semantic Kernel Agent Service creation:** the orchestrator release now uses Microsoft Agent Framework with direct model calls and local NL2SQL tool execution, eliminating the `AgentsOperations.create_agent` failure and reducing per-request setup latency. Fixes [Azure/GPT-RAG#461](https://github.com/Azure/GPT-RAG/issues/461) and [Azure/GPT-RAG#462](https://github.com/Azure/GPT-RAG/issues/462).
+- **Conversation rename persists after refresh:** the UI release now sends Chainlit rename events to the orchestrator conversation update API. Fixes [Azure/GPT-RAG#435](https://github.com/Azure/GPT-RAG/issues/435).
+
+## [v2.7.4] - 2026-05-26
+
+### Changed
+- **Bumped component releases for deploy image verification**: `gpt-rag-ui` to [v2.3.6](https://github.com/Azure/gpt-rag-ui/releases/tag/v2.3.6), `gpt-rag-orchestrator` to [v2.6.7](https://github.com/Azure/gpt-rag-orchestrator/releases/tag/v2.6.7), and `gpt-rag-ingestion` to [v2.3.7](https://github.com/Azure/gpt-rag-ingestion/releases/tag/v2.3.7).
+
+### Fixed
+- **Docker-free deploy no longer fails on revision restart race or Azure CLI warning output**: service deploy scripts now treat `az containerapp update --image` as the revision rollout, verify the configured image instead of immediately restarting the latest revision, and filter warning/progress output before consuming Azure CLI TSV values. Fixes [Azure/GPT-RAG#449](https://github.com/Azure/GPT-RAG/issues/449).
+
+## [v2.7.3] - 2026-05-25
+
+### Changed
+- **Bumped component releases for Docker-free deploy reliability**: `gpt-rag-ui` to [v2.3.4](https://github.com/Azure/gpt-rag-ui/releases/tag/v2.3.4), `gpt-rag-orchestrator` to [v2.6.5](https://github.com/Azure/gpt-rag-orchestrator/releases/tag/v2.6.5), and `gpt-rag-ingestion` to [v2.3.5](https://github.com/Azure/gpt-rag-ingestion/releases/tag/v2.3.5).
+
+### Fixed
+- **Component deploy no longer requires local Docker Desktop**: service deploy scripts now select ACR remote builds before probing Docker, support explicit `BUILD_MODE=acr-task`/`USE_DOCKER=false`, configure Container App registry identity, and restart the latest revision after image updates. Fixes [Azure/GPT-RAG#449](https://github.com/Azure/GPT-RAG/issues/449).
+
+## [v2.7.2] - 2026-05-25
+
+### Changed
+- **Bumped `gpt-rag-orchestrator` to [v2.6.4](https://github.com/Azure/gpt-rag-orchestrator/releases/tag/v2.6.4)** to consume the Agent Service startup warmup fix for default basic deployments.
+
+### Fixed
+- **Default `maf_lite` startup no longer creates Agent Service agents**: the orchestrator startup warmup is now strategy-aware, skips Agent Service entirely for the default `maf_lite` strategy, limits reusable startup agent creation to `single_agent_rag`, and reuses any existing `gpt-rag-agent-v2` by name before creating one. Fixes [Azure/GPT-RAG#456](https://github.com/Azure/GPT-RAG/issues/456).
+
+## [v2.7.1] - 2026-05-25
+
+### Changed
+- **Bumped `gpt-rag-ui` to [v2.3.3](https://github.com/Azure/gpt-rag-ui/releases/tag/v2.3.3)** to pick up the WSL/Linux Bash script line-ending fix for component deployment.
+
+### Fixed
+- **WSL/Linux UI component deploy failure**: `gpt-rag-ui` now ships repository line-ending attributes that keep `scripts/deploy.sh` and `scripts/preProvision.sh` checked out with LF endings, preventing `$'\r': command not found` and `set: pipefail` failures during `azd deploy`. Fixes [Azure/GPT-RAG#451](https://github.com/Azure/GPT-RAG/issues/451).
 
 ## [v2.7.0] - 2026-05-19
 
 > v2.7.0 bumps the **AI Landing Zone** Bicep module submodule from **v1.0.7 → v2.0.2**. This is a major-version submodule upgrade that brings several new capabilities (IP allow-lists, BYO Private DNS zones, BYO Log Analytics + App Insights, hub-and-spoke composability, deployment-mode preset, pre-flight validation hook) and a handful of bug fixes (most notably the `${VAR=null}` string-default bug that affected route-table wiring, the hardcoded service-flag defaults that ignored `azd env set` overrides, and two v2.0.0-only template-validation regressions in the AI Foundry account Private Endpoint emission and the AI Foundry-bundled sub-modules' PE subnet propagation — fixed in v2.0.1 and v2.0.2 respectively). Default behavior is **unchanged** for existing GPT-RAG operators — all new landing-zone capabilities are opt-in. See the [v2-migration guide](https://github.com/Azure/bicep-ptn-aiml-landing-zone/blob/v2.0.0/docs/v2-migration.md) and the [parameterization reference](https://azure.github.io/AI-Landing-Zones/bicep/parameterization) for details.
 
 ### Changed
-- **AI Landing Zone Bicep submodule bumped to [v2.0.2](https://github.com/Azure/bicep-ptn-aiml-landing-zone/releases/tag/v2.0.2)** (`ailz_tag` in `manifest.json`). The submodule pointer in `infra/` and the `branch` field in `.gitmodules` are both updated. v2.0.2 is a hotfix on top of v2.0.0 that resolves two ARM template-validation errors encountered while validating this very release: (a) a duplicate-name in the AI Foundry account Private Endpoint emission (v2.0.1, [PR #60](https://github.com/Azure/bicep-ptn-aiml-landing-zone/pull/60)), and (b) an unconditional `varPeSubnetId` propagation that caused the AI Foundry-bundled Cosmos DB, Key Vault, AI Search, and Storage Account modules to emit invalid private endpoint iterators under `_networkIsolation=false` (v2.0.2, [issue #63](https://github.com/Azure/bicep-ptn-aiml-landing-zone/issues/63) / [PR #64](https://github.com/Azure/bicep-ptn-aiml-landing-zone/pull/64)). No GPT-RAG-component bumps in this release (`gpt-rag-ui` v2.3.2, `gpt-rag-orchestrator` v2.6.3, `gpt-rag-ingestion` v2.3.4 carry over from v2.6.7).
-- **`scripts/preProvision.{ps1,sh}` now invoke the landing-zone preflight check** (`infra/scripts/Invoke-PreflightChecks.ps1`). This catches parameter-contradiction errors (BYO ID mismatches, malformed CIDR entries, subnet prefixes outside the VNet, mutually-exclusive hub-integration flags, etc.) *before* `azd provision` reaches Azure Resource Manager. Bypass with `PREFLIGHT_SKIP=true` (CI/offline). The shell version skips silently with a notice if `pwsh` is not installed.
+- **AI Landing Zone Bicep submodule bumped to [v2.0.2](https://github.com/Azure/bicep-ptn-aiml-landing-zone/releases/tag/v2.0.2) plus the merged ACR Tasks egress hotfix [PR #69](https://github.com/Azure/bicep-ptn-aiml-landing-zone/pull/69)** (`ailz_tag` in `manifest.json` remains `v2.0.2` for the jumpbox bootstrap script URL). v2.0.2 is a hotfix on top of v2.0.0 that resolves two ARM template-validation errors encountered while validating this very release: (a) a duplicate-name in the AI Foundry account Private Endpoint emission (v2.0.1, [PR #60](https://github.com/Azure/bicep-ptn-aiml-landing-zone/pull/60)), and (b) an unconditional `varPeSubnetId` propagation that caused the AI Foundry-bundled Cosmos DB, Key Vault, AI Search, and Storage Account modules to emit invalid private endpoint iterators under `_networkIsolation=false` (v2.0.2, [issue #63](https://github.com/Azure/bicep-ptn-aiml-landing-zone/issues/63) / [PR #64](https://github.com/Azure/bicep-ptn-aiml-landing-zone/pull/64)). PR #69 adds `packages.microsoft.com` to the network-isolated ACR Task build allow-list and adds `additionalAcrTaskBuildFqdns` for future solution-specific build dependencies. No GPT-RAG-component bumps in this release (`gpt-rag-ui` v2.3.2, `gpt-rag-orchestrator` v2.6.3, `gpt-rag-ingestion` v2.3.4 carry over from v2.6.7).
+- **`scripts/preProvision.{ps1,sh}` now fail fast on GPT-RAG regional readiness before ARM deployment starts.** The new GPT-RAG preflight validates the selected region, jumpbox VM SKU restrictions, provider/location support for AI Search, Cosmos DB, Container Apps, and AI Foundry/Cognitive Services, plus Azure OpenAI model quota for the exact deployments in `modelDeploymentList`. If model quota is insufficient, it suggests candidate regions when possible. It is intentionally explicit that transient service-capacity failures (for example Cosmos DB high-demand `ServiceUnavailable`) are not exposed by a reliable pre-create quota API. Bypass only these checks with `GPT_RAG_REGIONAL_PREFLIGHT_SKIP=true`; bypass all preflight hooks with `PREFLIGHT_SKIP=true`.
+- **`scripts/preProvision.{ps1,sh}` continue to invoke the landing-zone preflight check** (`infra/scripts/Invoke-PreflightChecks.ps1`). This catches parameter-contradiction errors (BYO ID mismatches, malformed CIDR entries, subnet prefixes outside the VNet, mutually-exclusive hub-integration flags, etc.) *before* `azd provision` reaches Azure Resource Manager. Bypass with `PREFLIGHT_SKIP=true` (CI/offline). The shell version now fails clearly if `pwsh` is missing for the GPT-RAG regional preflight instead of silently skipping regional checks.
+- **`scripts/preDeploy.{ps1,sh}` now key Network Isolation behavior only from `NETWORK_ISOLATION`**. Workstation runs should stop after `azd provision`; when `NETWORK_ISOLATION=true`, `azd deploy` must be run from the jumpbox/VNet with `RUN_FROM_JUMPBOX=true`, and the legacy `AZURE_ZERO_TRUST` deploy prompt is no longer used.
+- **`scripts/postProvision.{ps1,sh}` now honor `AZURE_SKIP_NETWORK_ISOLATION_WARNING=true` for automated network-isolated workstation provisions.** The local hook skips data-plane work without prompting, while the real data-plane setup still requires rerunning from the jumpbox/VNet with `RUN_FROM_JUMPBOX=true`.
 
 ### Added
 - **`main.parameters.json` surfaces three v2.0.0 parameters as substitutable env vars** so operators can opt into them via `azd env set`:
@@ -23,6 +281,7 @@ This format follows [Keep a Changelog](https://keepachangelog.com/) and adheres 
 - **Hardcoded service flags now respect `azd env set`** (landing-zone fix): `deploySearchService`, `deployStorageAccount`, `deployKeyVault`, `deployLogAnalytics`, `deployMcp`, `deployGroundingWithBing`, `deploySoftware`, `deployPostgres`, `greenFieldDeployment`, and `speechServiceSku` are no longer pinned at compile time in the landing-zone parameter file. v2.0.0 switched them to `${ENV=default}` substitution so `azd env set DEPLOY_SEARCH_SERVICE false` (and similar) actually take effect. The umbrella's parameter file passes them through.
 - **Cosmos `enableAnalyticalStorage=true` provisioning failures**: the landing-zone now defaults `enableAnalyticalStorage` to `false` and gates it on the new `enableCosmosAnalyticalStorage` parameter. v2.6.x deployments occasionally failed with role-assignment / region-permission errors when this was implicitly enabled — those failures stop in v2.7.0.
 - **Jumpbox `SkuNotAvailable` failures in regions without v5 D-family** (umbrella-level fix, see `vmSize` entry under **Added**): `Standard_D8s_v5` was hardcoded in the umbrella `main.parameters.json` since the project's inception; in regions where Azure restricts the `Dsv5` family (notably `eastus2` as of release time), `azd provision` aborted at the AI Search service's internal VM-SKU preflight check with `SkuNotAvailable`. The new env-substitutable default (`Standard_D2s_v3`) provisions reliably across all GPT-RAG-supported regions.
+- **PowerShell hooks on Windows jumpbox**: `scripts/preDeploy.ps1` and `scripts/postProvision.ps1` are now stored with a UTF-8 BOM so Windows PowerShell 5.1 reads the existing Unicode status messages correctly instead of parsing corrupted script text. `postProvision.ps1` also suppresses the Azure CLI dynamic-install warning without aborting when `$ErrorActionPreference='Stop'`.
 
 ### Opt-in landing-zone v2.0.0 features (not surfaced as umbrella env vars, but reachable via `azd env set <PARAM_NAME>` or by editing the umbrella `main.parameters.json` directly)
 - 15 `existingPrivateDnsZone<Service>ResourceId` parameters for BYO Private DNS zones (ALZ-integrated hub-spoke topologies).
