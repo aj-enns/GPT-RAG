@@ -47,6 +47,17 @@ A key capability of GPT-RAG is its support for **AI Agents**, enabling scenarios
 ![Zero Trust UI](media/gpt-rag-homepage.png)
 *GPT-RAG UI*
 
+## Architecture Advisor (Architecture Review)
+
+GPT-RAG also ships an optional **Architecture Advisor** strategy that turns the accelerator into an interactive architecture-review assistant. Given a free-form description of an app or workflow idea, it:
+
+1. Runs a multi-turn **requirements gate** that asks clarifying questions until it has enough context (then consolidates the dialog into a single problem statement).
+2. Uses a dedicated LLM **classifier** to assess *"Does this need AI?"* (yes / maybe / no, with confidence and rationale).
+3. Retrieves the most relevant patterns from an indexed copy of the [Azure Architecture Center](https://learn.microsoft.com/en-us/azure/architecture/browse/).
+4. Synthesizes a recommendation: primary pattern, AI-vs-non-AI alternatives, cost range, implementation checklist, and next steps.
+
+Enable it by setting `AGENT_STRATEGY=architecture_advisor` in Azure App Configuration. See [`architecture-advisor/README.md`](architecture-advisor/README.md) for the flow diagram, configuration keys, and deployment mapping.
+
 ## Contributing
 
 We welcome contributions! See the [contribution guidelines](https://azure.github.io/GPT-RAG/contributing/) for details on how to contribute.

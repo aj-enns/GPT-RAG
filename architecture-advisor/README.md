@@ -11,13 +11,21 @@ A pivot of the GPT-RAG solution accelerator into an **architecture advisor**
 that:
 
 1. Takes a free-form customer description of an app/workflow idea.
-2. Runs a dedicated LLM **classifier** to assess *"Does this need AI?"*
+2. Runs a multi-turn **requirements gate** that asks 2-4 clarifying questions
+   when the description is too thin, then consolidates the dialog into a single
+   enriched problem statement before recommending. The gate **fails open** —
+   if the model errors or the round cap is reached it proceeds to recommend.
+3. Runs a dedicated LLM **classifier** to assess *"Does this need AI?"*
    (yes / maybe / no + confidence + rationale).
-3. Retrieves the most relevant patterns from an indexed copy of the Azure
+4. Retrieves the most relevant patterns from an indexed copy of the Azure
    Architecture Center catalog (or, later, a customer-specific service
    catalog).
-4. Synthesizes a recommendation: **primary pattern + AI-vs-non-AI
+5. Synthesizes a recommendation: **primary pattern + AI-vs-non-AI
    alternatives + cost range + implementation checklist + next steps.**
+
+The gate, classifier, and synthesizer each run as **separate LLM calls** and
+stream progress feedback to the UI so the user sees activity during the
+multi-second synthesis step.
 
 The scaffolding in this folder is **drop-in code** that targets the existing
 component repositories — it is not meant to be deployed from this folder
@@ -41,6 +49,7 @@ architecture-advisor/
 │   └── prompts/
 │       ├── classifier_system.txt
 │       ├── classifier_examples.jsonl
+│       ├── gate_system.txt                # Requirements-gate system prompt
 │       └── synthesizer_template.txt
 ├── ingestion/                             # Drop into gpt-rag-ingestion/
 │   ├── jobs/
@@ -79,32 +88,53 @@ After moving files, register the new strategy in
 | Key | Default | Description |
 |-----|---------|-------------|
 | `AGENT_STRATEGY` | `architecture_advisor` | Activates this flow in the orchestrator. |
+| `ARCH_ADVISOR_GATE_DEPLOYMENT` | `{{CHAT_DEPLOYMENT_NAME}}` | Model used for the requirements-gate LLM call. |
+| `ARCH_ADVISOR_MAX_QUESTION_ROUNDS` | `2` | Max clarifying-question rounds before the gate proceeds to recommend. |
 | `ARCH_ADVISOR_CLASSIFIER_DEPLOYMENT` | `gpt-4o-mini` | Lightweight model used for the classifier LLM call. |
 | `ARCH_ADVISOR_SYNTHESIZER_DEPLOYMENT` | `gpt-4o` | Stronger model used for recommendation synthesis. |
 | `ARCH_ADVISOR_CLASSIFIER_THRESHOLD` | `0.6` | Confidence below which we always run RAG retrieval as a fallback. |
+| `ARCH_ADVISOR_TOP_K` | `6` | Number of candidate patterns retrieved per query. |
 | `SEARCH_ARCHITECTURE_INDEX_NAME` | `architecture-{{RESOURCE_TOKEN}}` | AI Search index holding the Architecture Center catalog. |
 | `LEARN_ARCHITECTURE_BROWSE_URL` | `https://learn.microsoft.com/en-us/azure/architecture/browse/` | Source URL for the ingester. |
 | `LEARN_ARCHITECTURE_INGEST_SCHEDULE` | `0 3 * * 0` | Weekly Sunday 03:00 re-ingest. |
 
+> **Reasoning-model note:** when the classifier/gate/synthesizer deployments
+> point at a GPT-5-class reasoning model (e.g. `gpt-5.4-nano`), the calls use
+> `reasoning_effort="low"` + `max_completion_tokens` + `timeout` and omit a
+> custom `temperature` (only the default is accepted). This prevents unbounded
+> reasoning from hanging the synthesis step.
+
 ## End-to-end flow
 
 ```mermaid
-flowchart LR
-   U[Customer description] --> C[AI Needs Classifier<br/>(separate LLM call)]
-   C -->|needs_ai = yes / maybe| R1[Hybrid retrieval<br/>(AI architectures)]
-   C -->|needs_ai = no| R2[Hybrid retrieval<br/>(non-AI architectures)]
+%%{init: {'theme':'base', 'themeVariables': {'lineColor':'#888888','primaryColor':'#1f6feb','primaryTextColor':'#ffffff','primaryBorderColor':'#58a6ff'}, 'flowchart': {'curve':'basis'}}}%%
+flowchart TD
+   U[Customer description] --> G[Requirements Gate<br/>separate LLM call]
+   G -->|not enough info| Q[Ask 2-4 clarifying questions, return]
+   Q -.->|user replies| U
+   G -->|ready / round cap / fail-open| C[AI Needs Classifier<br/>separate LLM call]
+   C -->|needs AI: yes or maybe| R1[Hybrid retrieval<br/>AI architectures]
+   C -->|needs AI: no| R2[Hybrid retrieval<br/>non-AI architectures]
    C -.->|low confidence| R3[Retrieve both]
-   R1 --> S[Recommendation Synthesizer<br/>(stronger LLM)]
+   R1 --> S[Recommendation Synthesizer<br/>stronger LLM]
    R2 --> S
    R3 --> S
    S --> O[Structured response:<br/>pattern + alternatives +<br/>cost range + checklist]
 ```
 
+The gate keeps multi-turn state in the conversation document, so each clarifying
+round re-enters at the top with the accumulated dialog. After a recommendation
+is produced the round counter resets, allowing a follow-up question to
+re-qualify from scratch.
+
 ## Phase 1 scope (this scaffold)
 
+- [x] Multi-turn **requirements gate** that asks clarifying questions and
+      consolidates the dialog before recommending (fails open).
 - [x] Classifier as a **separate LLM call** with confidence and rationale.
 - [x] Ingestion pipeline scaffold for Azure Architecture Center.
-- [x] Strategy orchestrator wiring classifier → retrieval → synthesizer.
+- [x] Strategy orchestrator wiring gate → classifier → retrieval → synthesizer.
+- [x] Streamed progress feedback so the UI isn't silent during synthesis.
 - [x] Structured recommendation output with alternatives + checklist.
 - [x] Search index schema for architecture patterns.
 
